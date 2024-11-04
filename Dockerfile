@@ -2,7 +2,8 @@
 FROM python:3.9-slim
 
 # Install Poetry
-RUN curl -sSL https://install.python-poetry.org | python3 -
+RUN curl -sSL https://install.python-poetry.org | python3 - && \
+    mv /root/.local/bin/poetry /usr/local/bin/
 
 # Set the working directory
 WORKDIR /app
