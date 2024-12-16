@@ -2,11 +2,15 @@ import streamlit as st
 import index
 import mutation_freq
 import variant_deconv
+import resistance_mut
+import resistance_mut_silo
 
 PAGES = {
     "Home": {"module": index}, 
     "Mutation Frequency": {"module": mutation_freq},
     "Variant Deconvolution": {"module": variant_deconv},
+    "Resistance Mutations (clinical)": {"module": resistance_mut},
+    "Resistance Mutations (ww)": {"module": resistance_mut_silo}
 }
 
 def sidebar():
