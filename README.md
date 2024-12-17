@@ -7,8 +7,10 @@
 ![AWS S3](https://img.shields.io/badge/AWS%20S3-Cloud-orange)
 
 This project provides a front-end interface for two primary use cases:
-- On-demand heatmaps of mutations to identify new variants emerging.
-- On-demand variant deconvolution powered by Lollipop.
+- On-demand heatmaps of mutations to identify new variants emerging, based on V-Pipe outputs.
+- On-demand variant deconvolution powered by LolliPop.
+- On-demand heatmaps of resistance mutation – querying LAPIS of clincial data.
+- On-demand heatmaps of resistance mutations - querying LAPS of wastewater data. 
 
 ## Overview
 
@@ -53,23 +55,28 @@ The current deployment of this project can be accessed at [biohack24.g15n.net](h
     cd vpipe-biohack24-frontend
     ```
 
-2. Build the Docker image:
-    ```sh
-    docker build -t vpipe-frontend .
-    ```
-
-3. Run the Docker container:
-    ```sh
-    docker run -p 8000:8000 --env-file .env vpipe-frontend
-    ```
-
-### Configuration
-
-1. Create a `.env` file in the root directory with your AWS credentials and S3 bucket information:
+2. Create a `.secrets.toml` file in the `.streamlit` directory with your AWS credentials and S3 bucket information:
     ```env
     AWS_ACCESS_KEY_ID=your_access_key_id
     AWS_SECRET_ACCESS_KEY=your_secret_access_key
     S3_BUCKET_NAME=your_s3_bucket_name
+    ```
+
+3. Configure the server IP addresses to LAPIS API for clinical and wastewater data in `config.yaml` including ports:
+    ```env
+    server:
+        ip_address: "http://3.71.80.16:8000"
+        lapis_address: "http://3.126.120.246:8080"
+    ```
+
+4. Build the Docker image:
+    ```sh
+    docker build -t vpipe-frontend .
+    ```
+
+5. Run the Docker container:
+    ```sh
+    docker run -p 8000:8000 vpipe-frontend
     ```
 
 ### Usage
