@@ -1,14 +1,13 @@
-import json
 from matplotlib import pyplot as plt
 import numpy as np
 import streamlit as st
-import requests
 import yaml
 import pandas as pd
 import logging
 import aiohttp
 import asyncio
 import seaborn as sns
+import streamlit.components.v1 as components
 
 
 # Load configuration from config.yaml
@@ -116,42 +115,86 @@ def app():
 
     # TODO: currently hardcoded, should be fetched from the server
     options = {
-        "3CLpro Inhibitors": 'data/3CLpro_inhibitors_datasheet.csv',
-        "RdRP Inhibitors": 'data/RdRP_inhibitors_datasheet.csv',
-        "Spike mAbs": 'data/spike_mAbs_datasheet.csv'
+        "3CLpro Inhibitors": 'data/translated_3CLpro_in_ORF1a_mutations.csv',
+        "RdRP Inhibitors": 'data/translated_RdRp_in_ORF1a_ORF1b_mutations.csv',
+        "Spike mAbs": 'data/translated_Spike_in_S_mutations.csv'
     }
+
 
     selected_option = st.selectbox("Select a resistance mutation set:", options.keys())
 
+    st.write("Note that mutation sets `3CLpro` and `RdRP`refer to mature proteins, " \
+    "thus the mutations are in the ORF1a and ORF1b genes, respectively and translated here.")
+
     df = pd.read_csv(options[selected_option])
 
-    gene_name =  {
-        "3CLpro Inhibitors": "ORF1a",
-        "RdRP Inhibitors": "ORF1b",
-        "Spike mAbs": "S"
-    }
-
-    # get the gene name
-    gene = gene_name[selected_option]
-
+    
     # Get the list of mutations for the selected set
     mutations = df['Mutation'].tolist()
-    # Lambda function to format the mutation list, from S24L to S:24L
-    format_mutation = lambda x: f"{gene}:{x[0]}{x[1:]}"
-    #format_mutation = lambda x: f"{x[0]}:{x[1:]}"
     # Apply the lambda function to each element in the mutations list
-    formatted_mutations = [format_mutation(mutation) for mutation in mutations]
-
-    if st.button("Show Mutations"):
-        st.write(f"Selected mutations:")
-        st.write(formatted_mutations)
+    formatted_mutations = mutations
     
 
     # Allow the user to choose a date range
     st.write("Select a date range:")
     date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-10"), pd.to_datetime("2025-03-08")])
 
-    if st.button("Fetch Data"):
+
+    start_date = date_range[0].strftime('%Y-%m-%d')
+    end_date = date_range[1].strftime('%Y-%m-%d')
+
+    location = "Zürich (ZH)"
+    sequence_type_value = "amino acid"
+
+    formatted_mutations_str = str(formatted_mutations).replace("'", '"')
+
+    ### GenSpectrum Dashboard Component ###
+
+    st.write("### GenSpectrum Dashboard Dynamic Mutation Heatmap")
+    st.write("This component only shows mutations above an unknown threshold.")
+    st.write("This is under investigation.")
+
+    # Use the dynamically generated list of mutations string
+    # The formatted_mutations_str variable already contains the string representation
+    # of the list with double quotes, e.g., '["ORF1a:T103L", "ORF1a:N126K"]'
+    # The lapisFilter uses double curly braces {{ and }} to escape the literal
+    # curly braces needed for the JSON object within the f-string.
+    components.html(
+        f"""
+        <html>
+        <head>
+        <script type="module" src="https://unpkg.com/@genspectrum/dashboard-components@latest/standalone-bundle/dashboard-components.js"></script>
+        <link rel="stylesheet" href="https://unpkg.com/@genspectrum/dashboard-components@latest/dist/style.css" />
+        </head>
+            <body>
+            <!-- Component documentation: https://genspectrum.github.io/dashboard-components/?path=/docs/visualization-mutations-over-time--docs -->
+            <gs-app lapis="{server_ip}">
+                <gs-mutations-over-time
+                lapisFilter='{{"sampling_dateFrom":"{start_date}", "sampling_dateTo": "{end_date}", "location_name": "{location}"}}'
+                sequenceType='{sequence_type_value}'
+                views='["grid"]'
+                width='100%'
+                height='100%'
+                granularity='day'
+                displayMutations='{formatted_mutations_str}'
+                lapisDateField='sampling_date'
+                initialMeanProportionInterval='{{"min":0.00,"max":1.0}}'
+                pageSizes='[50, 30, 20, 10]'
+                />
+            </gs-app>
+            <body>
+            
+            </body>
+        </html>
+    """,
+        height=500,
+    )
+
+    ### Python plot ###
+    st.write("### Python Plot")
+    st.write("This plot shows the mutations over time.")
+
+    if st.button("Making Python Plot - manual API calls"):
         st.write("Fetching data...")
         df = fetch_reformat_data(formatted_mutations, date_range)
         
@@ -162,6 +205,30 @@ def app():
             # Plot the heatmap
             fig = plot_heatmap(df)
             st.pyplot(fig)
+    
 
+    # fetch the counts for SE990A
+    async def fetch_single_mutation(mutation, date_range):
+        async with aiohttp.ClientSession() as session:
+            return await fetch_data(session, mutation, date_range)
+
+    ### Debugging ###
+    st.write("### Debugging")
+    st.write("This section shows the raw data for the mutations.")
+    ## make textboxed top select two mutations
+    mutation1 = st.text_input("Mutation 1", "ORF1b:D475Y")
+    mutation2 = st.text_input("Mutation 2", "ORF1b:E793A")
+    st.write("Fetching data for mutations:")
+    st.write(mutation1)
+    st.write(mutation2)
+    data_mut1 = asyncio.run(fetch_single_mutation(mutation1, date_range))
+    data_mut2 = asyncio.run(fetch_single_mutation(mutation2, date_range))
+    st.write("Data for mutation 1:")
+    st.write(data_mut1)
+    st.write("Data for mutation 2:")
+    st.write(data_mut2)
+
+
+    st.write('making calls to `sample/aggregated` endpoint for each mutation filtering for `aminoAcidMutations`: ["ORF1b:D475Y"]')
 if __name__ == "__main__":
     app()
