@@ -58,6 +58,7 @@ def app():
             mutation_data = fetch_mutations_api(variantQuery, sequence_type, min_abundance)
             df = pd.DataFrame(mutation_data)
             st.session_state['last_fetched_df'] = df.copy()
+            st.session_state['has_fetched_mutations'] = True  # Set flag after first fetch
             if df.empty:
                 st.session_state['mutations'] = []
                 st.session_state['mutation_df'] = pd.DataFrame()
@@ -74,6 +75,7 @@ def app():
         except Exception as e:
             st.session_state['mutations'] = []
             st.session_state['mutation_df'] = pd.DataFrame()
+            st.session_state['has_fetched_mutations'] = True  # Set flag even on error
             st.error(f"Failed to fetch mutations. Please check your query and try again.\nError details: {e}")
 
     # --- UI controls ---
@@ -119,6 +121,15 @@ def app():
     # --- Data editor for mutation selection ---
     selected_mutations = None
     if not st.session_state['mutation_df'].empty:
+        # Add edit mode toggle only if table is shown
+        if 'edit_mode' not in st.session_state:
+            st.session_state['edit_mode'] = False
+        if st.session_state['edit_mode']:
+            if st.button('Done Editing'):
+                st.session_state['edit_mode'] = False
+        else:
+            if st.button('Edit Table'):
+                st.session_state['edit_mode'] = True
         # Try to get the last fetched DataFrame for extra columns
         df = st.session_state.get('last_fetched_df', pd.DataFrame())
         # Merge coverage and proportion columns if available
@@ -143,17 +154,25 @@ def app():
         else:
             merged = mutation_df
         st.info(f"{len(merged)} signature mutations found.")
+        # Set disabled columns based on edit mode
+        if st.session_state['edit_mode']:
+            disabled_cols = []  # allow editing all
+        else:
+            disabled_cols = merged.columns.tolist()  # disable all columns
         edited_df = st.data_editor(
             merged,
             num_rows="dynamic",
             use_container_width=True,
             key='mutation_editor',
-            disabled=["Mutation", "coverage", "proportion"] if 'coverage' in merged.columns or 'proportion' in merged.columns else ["Mutation"],
+            disabled=disabled_cols,
         )
         st.session_state['mutation_df'] = edited_df[[c for c in edited_df.columns if c in ['Mutation', 'Selected']]]
+        # Fill NaN in 'Selected' with False to avoid ValueError when filtering
+        edited_df['Selected'] = edited_df['Selected'].fillna(False)
         selected_mutations = edited_df[edited_df['Selected']]['Mutation'].tolist()
     else:
-        st.info("No mutations found. Adjust your filters or add mutations manually.")
+        if st.session_state.get('has_fetched_mutations', False):
+            st.info("No mutations found. Adjust your filters or add mutations manually.")
 
     # --- Only show coverage/proportion plots after first query ---
     if 'last_fetched_df' in st.session_state:
@@ -174,7 +193,8 @@ def app():
                 df = st.session_state['last_fetched_df']
         if df is None or df.empty:
             df = mutation_df
-        fig, axes = plt.subplots(1, 2, figsize=(10, 4))
+        # Use a reasonable max width for the figure
+        fig, axes = plt.subplots(1, 2, figsize=(8, 4))
         plotted = False
         if not df.empty:
             if 'coverage' in df.columns:
@@ -188,7 +208,7 @@ def app():
             if 'proportion' in df.columns:
                 axes[1].hist(df['proportion'].dropna(), bins=20, color='orange', edgecolor='black')
                 axes[1].set_title('Proportion Distribution')
-                axes[1].set_xlabel('Proportion (fraction of clinical sequences with this mutation in this variant)')
+                axes[1].set_xlabel('Proportion')
                 axes[1].set_ylabel('Count')
                 plotted = True
             else:
@@ -199,11 +219,15 @@ def app():
             fig, ax = plt.subplots(figsize=(5, 2))
             ax.text(0.5, 0.5, 'No coverage or proportion data available.', ha='center', va='center')
             ax.axis('off')
-            st.pyplot(fig)
+            # Center the plot
+            cols = st.columns([1,2,1])
+            with cols[1]:
+                st.pyplot(fig)
         else:
-            st.pyplot(fig)
-        
-
+            # Center the plot
+            cols = st.columns([1,2,1])
+            with cols[1]:
+                st.pyplot(fig)
         st.markdown("---")
 
             
@@ -247,6 +271,10 @@ def app():
    
     # Check if all necessary parameters are available
     if selected_mutations and date_range and len(date_range) == 2 and location:
+
+        st.write("NOTE: currntly the below GenSpectrum Plot does not show mutations that have zero proporion in the selected date range.")
+        st.write("Absence of the mutation, does not mean no coverage – this ISSUE is currently being considered.")
+
         # Use the dynamically generated list of mutations string
         # The formatted_mutations_str variable already contains the string representation
         # of the list with double quotes, e.g., '["ORF1a:T103L", "ORF1a:N126K"]'
