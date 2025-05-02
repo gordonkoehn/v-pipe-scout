@@ -1,11 +1,10 @@
 import streamlit as st
 import yaml
 import pandas as pd
-import logging
 import streamlit.components.v1 as components
 
-from common import fetch_locations, parse_url_hostname
-import requests
+from api.wiseloculus import WiseLoculusLapis
+from api.covspectrum import CovSpectrumLapis
 
 
 # Load configuration from config.yaml
@@ -15,6 +14,8 @@ with open('config.yaml', 'r') as file:
 server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
 cov_sprectrum_api = config.get('server', {}).get('cov_spectrum_api', 'https://lapis.cov-spectrum.org')
     
+wiseLoculus = WiseLoculusLapis(server_ip)
+covSpectrum = CovSpectrumLapis(cov_sprectrum_api)
 
 def app():
     st.title("Variant Signature Composer")
@@ -35,27 +36,13 @@ def app():
     if 'mutation_df' not in st.session_state:
         st.session_state['mutation_df'] = pd.DataFrame()
 
-    def fetch_mutations_api(variantQuery, sequence_type, min_abundance):
-        base_url = f"{cov_sprectrum_api}/open/v2/sample/"
-        params = (
-            f"variantQuery={variantQuery}"
-            f"&minProportion={min_abundance}"
-            f"&limit=1000"
-            f"&downloadAsFile=false"
-        )
-        if sequence_type == "Nucleotides":
-            url = f"{base_url}nucleotideMutations?{params}"
-        else:
-            url = f"{base_url}aminoAcidMutations?{params}"
-        resp = requests.get(url)
-        resp.raise_for_status()
-        data = resp.json()
-        return data.get("data", [])
-
     # Save the last fetched DataFrame for plotting
     def fetch_mutations():
+        """
+        Fetch mutations from the API based on user input and update session state.
+        """
         try:
-            mutation_data = fetch_mutations_api(variantQuery, sequence_type, min_abundance)
+            mutation_data = covSpectrum.fetch_mutations(variantQuery, sequence_type, min_abundance, cov_sprectrum_api)
             df = pd.DataFrame(mutation_data)
             st.session_state['last_fetched_df'] = df.copy()
             st.session_state['has_fetched_mutations'] = True  # Set flag after first fetch
@@ -179,7 +166,6 @@ def app():
         st.markdown('---')
         st.subheader('Coverage and Proportion Distributions')
         import matplotlib.pyplot as plt
-        import numpy as np
         # Try to use the last mutation DataFrame if available
         mutation_df = st.session_state.get('mutation_df', pd.DataFrame())
         # Use the original DataFrame if available (for coverage/proportion columns)
@@ -262,10 +248,7 @@ def app():
     end_date = date_range[1].strftime('%Y-%m-%d')
     #### #4) Select the location
     default_locations = ["Zürich (ZH)"]  # Define default locations
-    # TODO: remove the next two lines
-    address_no_port = parse_url_hostname(server_ip)
-    location_url = f'{address_no_port}/sample/aggregated?fields=location_name&limit=100&dataFormat=JSON&downloadAsFile=false'
-    locations = fetch_locations(location_url, default_locations)
+    locations = wiseLoculus.fetch_locations(default_locations)
     location = st.selectbox("Select Location:", locations)
 
    

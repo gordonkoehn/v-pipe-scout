@@ -4,7 +4,7 @@ import pandas as pd
 import yaml
 import logging # Import the logging module
 
-from common import fetch_locations, parse_url_hostname
+from api.lapis import Lapis
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -16,22 +16,7 @@ with open('config.yaml', 'r') as file:
 
 server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
 
-def parse_url_hostname(url_string):
-    """Parses a URL string and returns the scheme and hostname."""
-    try:
-        parsed_url = urlparse(url_string)
-        if parsed_url.hostname:
-            address_no_port = f"{parsed_url.scheme}://{parsed_url.hostname}"
-            logging.info(f"Parsed URL: {url_string}, Address without port: {address_no_port}")
-            return address_no_port
-        else:
-            logging.warning(f"Could not parse hostname from {url_string}. Returning original.")
-            return url_string # Fallback to the original URL
-    except Exception as e:
-        logging.error(f"Error parsing URL {url_string}: {e}", exc_info=True)
-        return url_string # Fallback in case of any parsing error
-
-
+covSpectrumAPI = Lapis(server_ip)
 
 def app():
 
@@ -55,12 +40,8 @@ def app():
 
     ## Fetch locations from API
     default_locations = ["Zürich (ZH)", "Lugano (TI)", "Chur (GR)"] # Define default locations
-    # Use the function to parse the URL
-    address_no_port = parse_url_hostname(server_ip)
-    # Construct the location URL
-    location_url = f'{address_no_port}/sample/aggregated?fields=location_name&limit=100&dataFormat=JSON&downloadAsFile=false'
     # Fetch locations using the new function
-    locations = fetch_locations(location_url, default_locations)
+    locations = covSpectrumAPI.fetch_locations(default_locations)
 
     location = st.selectbox("Select Location:", locations)
 
@@ -78,7 +59,7 @@ def app():
         </head>
             <body>
             <!-- Component documentation: https://genspectrum.github.io/dashboard-components/?path=/docs/visualization-mutations-over-time--docs -->
-            <gs-app lapis="{server_ip}">
+            <gs-app lapis="{covSpectrumAPI.server_ip}">
                 <gs-mutations-over-time
                 lapisFilter='{{"sampling_dateFrom":"{start_date}", "sampling_dateTo": "{end_date}", "location_name": "{location}"}}'
                 sequenceType='{sequence_type_value}'
