@@ -1,0 +1,25 @@
+name: Streamlit app
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  streamlit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          environment-file: environment.yml
+          activate-environment: vpipe-frontend
+          auto-activate-base: false
+      - name: Testing – Smoke & Unit Tests
+        run: conda run -n vpipe-frontend pytest
+        env:
+          PYTHONPATH: ${{ github.workspace }}
