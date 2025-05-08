@@ -4,19 +4,19 @@ channels:
   - bioconda
 dependencies:
   - python=3.9
-  - streamlit
+  - streamlit=1.45.0
   - matplotlib
   - numpy
-  - pandas
+  - pandas=2.2.3
   - pyyaml
-  - boto3
-  - s3fs
   - seaborn
-  - pillow
   - aiohttp
   - requests
   - pytest
+  - streamlit-pydantic
+  - pydantic>=1.9,<2
   - cojac>=0.9.3
-  - pip
+  - plotly
   - pip:
-      - st-files-connection
+      - matplotlib-venn
+  
