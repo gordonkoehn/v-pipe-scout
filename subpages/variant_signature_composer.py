@@ -16,6 +16,7 @@ import matplotlib
 import plotly.graph_objects as go
 from pydantic import BaseModel, Field
 from typing import List
+import re
 
 from api.signatures import get_variant_list, get_variant_names
 from api.signatures import Mutation
@@ -327,6 +328,22 @@ def app():
         
         # Create column names (variant names)
         columns = ["Mutation"] + [variant.name for variant in combined_variants.variants]
+
+        # Extract the position number from mutation strings for sorting
+        def extract_position(mutation_str):
+            # Use the same regex pattern from Mutation.validate_mutation_string
+            match = re.match(r"^([ACGTN]?)(\d+)([ACGTN-])$", mutation_str.upper())
+            if match:
+                return int(match.group(2))  # Return the position as integer
+            return 0  # Fallback if regex fails
+        
+        # Sort mutations by position number
+        matrix_data.sort(key=lambda x: extract_position(x[0]), reverse=True)  # Sort by position in descending order
+        
+        # Sort columns alphabetically by variant name, but keep "Mutation" as the first column
+        variant_columns = columns[1:]  # Skip the "Mutation" column
+        variant_columns.sort()  # Sort alphabetically
+        columns = ["Mutation"] + variant_columns
         
         # Create DataFrame
         matrix_df = pd.DataFrame(matrix_data, columns=columns)
@@ -336,12 +353,11 @@ def app():
 
         # Visualize the data in different ways
         if len(combined_variants.variants) > 1:
-            import altair as alt
             
             # Create a matrix to show shared mutations between variants
             variant_names = [variant.name for variant in combined_variants.variants]
             variant_comparison = pd.DataFrame(index=variant_names, columns=variant_names)
-            
+
             # For each pair of variants, count the number of shared mutations
             for i, variant1 in enumerate(combined_variants.variants):
                 for j, variant2 in enumerate(combined_variants.variants):
@@ -511,15 +527,11 @@ def app():
 
             # 3. Mutation-Variant Matrix Visualization (heatmap) - Collapsible
             with st.expander("Variant-Signatures Bitmap Visualization", expanded=False):
-                # Add debug information at the top of the expander
-                if not variant_comparison_melted.empty:
-                    st.write(f"Comparing {len(combined_variants.variants)} variants with {variant_comparison_melted['shared_mutations'].sum()} total shared mutations")
-                
+
                 st.write("This heatmap shows which mutations (rows) are present in each variant (columns). Blue cells indicate the mutation is present.")
                 
                 # First prepare the data in a suitable format
                 binary_matrix = matrix_df.set_index("Mutation")
-                
         
                 # Use Plotly for a more interactive visualization
                 fig = go.Figure(data=go.Heatmap(
@@ -530,8 +542,12 @@ def app():
                     showscale=False,  # Hide color scale bar
                     hoverongaps=False
                 ))
-                
-                # Customize layout
+
+                # Calculate dimensions based on data size
+                num_mutations = len(binary_matrix.index)
+                num_variants = len(binary_matrix.columns)
+
+                # Customize layout with settings to ensure all labels are visible
                 fig.update_layout(
                     title='Mutation-Variant Matrix',
                     xaxis=dict(
@@ -540,10 +556,14 @@ def app():
                     ),
                     yaxis=dict(
                         title='Mutation',
+                        automargin=True,  # Automatically adjust margins for labels
+                        tickmode='array',  # Force all ticks
+                        tickvals=list(range(len(binary_matrix.index))),  # Positions for each mutation
+                        ticktext=binary_matrix.index,  # Actual mutation labels
                     ),
-                    height=max(500, min(1200, 20 * len(all_mutations))),  # Dynamic height based on mutations
-                    width=max(600, 100 * len(combined_variants.variants)),  # Dynamic width based on variants
-                    margin=dict(l=100, r=20, t=60, b=20),  # Adjust margins for labels
+                    height=max(500, min(2000, 25 * num_mutations)),  # Dynamic height based on mutations
+                    width=max(600, 120 * num_variants),  # Dynamic width based on variants
+                    margin=dict(l=150, r=20, t=50, b=20),  # Increase left margin for y labels
                 )
                 
                 # Add custom hover text
@@ -577,16 +597,6 @@ def app():
             mime="text/csv",
         )
         
-        # Also prepare a YAML for var_dates
-        var_dates = {variant.name: "" for variant in combined_variants.variants}
-        yaml_str = yaml.dump(var_dates, default_flow_style=False)
-        
-        st.download_button(
-            label="Download var_dates.yaml Template",
-            data=yaml_str,
-            file_name="var_dates.yaml",
-            mime="text/yaml",
-        )
 
 if __name__ == "__main__":
     app()
