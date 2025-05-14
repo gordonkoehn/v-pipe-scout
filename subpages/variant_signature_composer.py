@@ -17,10 +17,13 @@ import plotly.graph_objects as go
 from pydantic import BaseModel, Field
 from typing import List
 import re
+import logging
+
 
 from api.signatures import get_variant_list, get_variant_names
 from api.signatures import Mutation
 from api.covspectrum import CovSpectrumLapis
+from api.wiseloculus import WiseLoculusLapis
 from components.variant_signature_component import render_signature_composer
 from state import VariantSignatureComposerState
 from api.signatures import Variant as SignatureVariant
@@ -181,36 +184,44 @@ def app():
     custom_container = st.container()
     
     # Render the variant signature component
-    selected_mutations, _ = render_signature_composer(
+    result = render_signature_composer(
         covSpectrum,
         component_config,
-        session_prefix="custom_variant_",  # Use a prefix to avoid session state conflicts
+        session_prefix="custom_variant_",  
         container=custom_container
     )
-    
-    # Add custom variant to the combined list if mutations were selected
-    if selected_mutations:
-        # Get the variant name from the input field
-        variant_query = st.session_state.get("custom_variant_variantQuery", "Custom Variant")
-        
-        # Create and add the custom variant
-        custom_variant = Variant(
-            name=variant_query,
-            signature_mutations=selected_mutations
-        )
+    if result is not None:
+        selected_mutations, _ = result
+    else:
+        selected_mutations = []
 
-        # Check if the variant already exists in the combined list
-        if any(v.name == custom_variant.name for v in combined_variants.variants):
-            st.warning(f"Variant '{custom_variant.name}' already exists in the list. Please choose a different name.")
+
+    # make button to add custom variant
+    st.button("Add Custom Variant", key="add_custom_variant_button")
+    # Check if the button was clicked
+    if st.session_state.get("add_custom_variant_button", False):
+        # Check if any mutations were selected
+        if not selected_mutations:
+            st.warning("Please select at least one mutation to create a custom variant.")
         else:
-            # Add the custom variant to the combined list
-            combined_variants.add_variant(custom_variant)
-        
-            # Show confirmation
-            st.success(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations")
-            # Rerun to update the UI
-            st.rerun()
-
+            # Show the selected mutations
+            st.write("Selected Signature Mutations:")
+            variant_query = st.session_state.get("custom_variant_variantQuery", "Custom Variant")
+            custom_variant = Variant(
+                                    name=variant_query,
+                                    signature_mutations=selected_mutations
+                                    )   
+            st.write(custom_variant)
+            if any(v.name == custom_variant.name for v in combined_variants.variants):
+                st.warning(f"Variant '{custom_variant.name}' already exists in the list. Please choose a different name.")
+            else:
+                # Add the custom variant to the combined list
+                combined_variants.add_variant(custom_variant)
+                logging.info(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations.")
+                
+                # Show confirmation
+                st.success(f"Added custom variant '{variant_query}' with {len(selected_mutations)} mutations")
+    
     # Combine all selected variants for processing
     selected_variants = [variant.name for variant in combined_variants.variants]
 
@@ -483,11 +494,13 @@ def app():
                         from matplotlib_venn import venn2
                         
                         # Create sets of mutations for each variant
-                        sets = [set(variant.signature_mutations) for variant in combined_variants.variants]
-                        
+                        set1 = set(combined_variants.variants[0].signature_mutations)
+                        set2 = set(combined_variants.variants[1].signature_mutations)
+            
                         # Create a more compact figure with better proportions
                         fig_venn, ax_venn = plt.subplots(figsize=(5, 4))
-                        venn = venn2(sets, [variant.name for variant in combined_variants.variants], ax=ax_venn)
+                        variant_names = tuple(variant.name for variant in combined_variants.variants)
+                        venn2((set1, set2), variant_names, ax=ax_venn)
                         
                         # Adjust layout to be more compact
                         plt.tight_layout(pad=1.0)
@@ -503,12 +516,15 @@ def app():
                     elif len(combined_variants.variants) == 3:
                         from matplotlib_venn import venn3
                         
-                        # Create sets of mutations for each variant
-                        sets = [set(variant.signature_mutations) for variant in combined_variants.variants]
+                        # Create sets of mutations for each variant - extract exactly 3 sets as required by venn3
+                        set1 = set(combined_variants.variants[0].signature_mutations)
+                        set2 = set(combined_variants.variants[1].signature_mutations)
+                        set3 = set(combined_variants.variants[2].signature_mutations)
                         
                         # Create a more compact figure with better proportions
                         fig_venn, ax_venn = plt.subplots(figsize=(5, 4))
-                        venn = venn3(sets, [variant.name for variant in combined_variants.variants], ax=ax_venn)
+                        variant_names = tuple(variant.name for variant in combined_variants.variants)
+                        venn3((set1, set2, set3), variant_names, ax=ax_venn)
                         
                         # Adjust layout to be more compact
                         plt.tight_layout(pad=1.0)
@@ -586,7 +602,7 @@ def app():
             st.warning("At least two variants are required to visualize the mutation-variant matrix.")
     
         # Export functionality
-        st.subheader("Export Data")
+        st.subheader("Export Variant Signatures")
         
         # Convert to CSV for download
         csv = matrix_df.to_csv(index=False)
@@ -597,6 +613,76 @@ def app():
             mime="text/csv",
         )
         
+        st.markdown("---")
+
+        st.subheader("Download Mutation Counts and Coverage")
+
+        with st.expander("Fetch and download mutation counts and coverage data", expanded=False):
+            st.write("You can download the mutation counts and coverage data for the selected mutations over a specified date range and location.")
+            st.write("This data is fetched from the the Loculus Wastewater Instance and can be used for further analysis, such as tracking variant prevalence over time.")
+            st.write("Please specify the date range for the data.")
+            # Date range input
+            date_range = st.date_input(
+            "Select Date Range",
+            value=[pd.to_datetime("2025-02-10"), pd.to_datetime("2025-03-8")],
+            min_value=pd.to_datetime("2025-01-01"),
+            max_value=pd.to_datetime("2025-05-31"),
+            help="Select the date range for which you want to fetch mutation counts and coverage data."
+            )
+            
+            server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
+            wiseLoculus = WiseLoculusLapis(server_ip)
+
+            # Fetch locations using the new function
+            if "locations" not in st.session_state:
+                st.session_state.locations = wiseLoculus.fetch_locations()
+            locations = st.session_state.locations
+            location = st.selectbox("Select Location:", locations)
+
+            # Add a button to trigger fetching
+            if st.button("Fetch Data"):
+                # Get the latest mutation list
+                mutations = matrix_df["Mutation"].tolist()
+                
+                with st.spinner('Fetching mutation counts and coverage data...'):
+                    # Store the result in session state
+                    st.session_state.counts_df3d = wiseLoculus.fetch_counts_and_coverage_3D_df_nuc(
+                    mutations,
+                    date_range,
+                    location
+                    )
+                st.success("Data fetched successfully!")
+                
+            # Only show download buttons if data exists
+            if 'counts_df3d' in st.session_state and st.session_state.counts_df3d is not None:
+                # Create columns for download buttons
+                col1, col2 = st.columns(2)
+                
+                # 1. CSV Download
+                with col1:
+                    # Make sure to preserve index for dates and mutations
+                    csv = st.session_state.counts_df3d.to_csv(index=True)
+                    st.download_button(
+                    label="Download as CSV",
+                    data=csv,
+                    file_name='mutation_counts_coverage.csv',
+                    mime='text/csv',
+                    help="Download all data as a single CSV file with preserved indices."
+                    )
+                
+                # 2. JSON Download
+                with col2:
+                    # Convert to JSON structure - using 'split' format to preserve indices
+                    json_data = st.session_state.counts_df3d.to_json(orient='split', date_format='iso', index=True)
+                    
+                    st.download_button(
+                    label="Download as JSON",
+                    data=json_data,
+                    file_name='mutation_counts_coverage.json',
+                    mime='application/json',
+                    help="Download data as a JSON file that preserves dates and mutation indices."
+                    )
+
 
 if __name__ == "__main__":
     app()
