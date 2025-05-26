@@ -89,56 +89,101 @@ class WiseLoculusLapis(Lapis):
         if mutation_type not in ["nucleotide"]:
             logging.error(f"Unknown mutation type: {mutation_type}")
             raise NotImplementedError(f"Unknown mutation type: {mutation_type}")
-
+        
         async with aiohttp.ClientSession() as session:
             combined_results = []
 
             for mutation in mutations:
-                # Extract the target nucleotide from the mutation (e.g., A456T -> T)
-                target_nucleotide = mutation[-1]
+                target_symbol = mutation[-1]  # The last character is the target nucleotide or amino acid
+ 
+                if mutation_type == "aminoAcid":
+                    amino_acids = ["A", "C", "D", "E", "F", "G", "H", "I", "K", 
+                                    "L", "M", "N", "P", "Q", "R", "S", "T", 
+                                    "V", "W", "Y"]
+                    # For amino acid mutations, we need to fetch counts for all amino acids
+                    coverage_tasks = [
+                        self.fetch_sample_aggregated(session, f"{mutation[:-1]}{aa}", "aminoAcid", date_range, location_name)
+                        for aa in amino_acids
+                    ]
+                    coverage_results = await asyncio.gather(*coverage_tasks)
 
-                # Fetch counts for A, T, C, G at the mutation's position
-                nucleotides = ['A', 'T', 'C', 'G']
-                coverage_tasks = [
-                    self.fetch_sample_aggregated(session, f"{mutation[:-1]}{nt}", "nucleotide", date_range, location_name)
-                    for nt in nucleotides
-                ]
-                coverage_results = await asyncio.gather(*coverage_tasks)
+                    # Parse coverage_results to extract counts for each nucleotide
+                    coverage_data = {
+                        nt: sum(entry['count'] for entry in item['data']) if item['data'] else 0
+                        for nt, item in zip(amino_acids, coverage_results)
+                    }
+                    # Calculate total coverage
+                    total_coverage = sum(coverage_data.values())
 
-                # Parse coverage_results to extract counts for each nucleotide
-                coverage_data = {
-                    nt: sum(entry['count'] for entry in item['data']) if item['data'] else 0
-                    for nt, item in zip(nucleotides, coverage_results)
-                }
+                    # Calculate frequency for the target nucleotide
+                    frequency = coverage_data.get(target_symbol, 0) / total_coverage if total_coverage > 0 else 0
 
-                # Calculate total coverage
-                total_coverage = sum(coverage_data.values())
+                    # Append the result for this mutation
+                    combined_results.append({
+                        "mutation": mutation,
+                        "coverage": total_coverage,
+                        "frequency": frequency,
+                        "counts": coverage_data
+                    })
 
-                # Calculate frequency for the target nucleotide
-                frequency = coverage_data.get(target_nucleotide, 0) / total_coverage if total_coverage > 0 else 0
+                    # Stratify results by sampling_date
+                    stratified_results = {}
+                    for nt, item in zip(amino_acids, coverage_results):
+                        for entry in item['data']:
+                            date = entry['sampling_date']
+                            count = entry['count']
+                            if date not in stratified_results:
+                                stratified_results[date] = {"counts": {n: 0 for n in amino_acids}, "coverage": 0}
+                            stratified_results[date]["counts"][nt] += count
+                            stratified_results[date]["coverage"] += count
 
-                # Append the result for this mutation
-                combined_results.append({
-                    "mutation": mutation,
-                    "coverage": total_coverage,
-                    "frequency": frequency,
-                    "counts": coverage_data
-                })
+                elif mutation_type == "nucleotide":
+                    nucleotides = ['A', 'T', 'C', 'G']
+                    # For nucleotide mutations, we fetch counts for A, T, C, G
+                    # The mutation is expected to be in the format like "A456T"
+                    coverage_tasks = [
+                        self.fetch_sample_aggregated(session, f"{mutation[:-1]}{nt}", "nucleotide", date_range, location_name)
+                        for nt in nucleotides
+                    ]
+                    coverage_results = await asyncio.gather(*coverage_tasks)
 
-                # Stratify results by sampling_date
-                stratified_results = {}
-                for nt, item in zip(nucleotides, coverage_results):
-                    for entry in item['data']:
-                        date = entry['sampling_date']
-                        count = entry['count']
-                        if date not in stratified_results:
-                            stratified_results[date] = {"counts": {n: 0 for n in nucleotides}, "coverage": 0}
-                        stratified_results[date]["counts"][nt] += count
-                        stratified_results[date]["coverage"] += count
+                    # Parse coverage_results to extract counts for each nucleotide
+                    coverage_data = {
+                        nt: sum(entry['count'] for entry in item['data']) if item['data'] else 0
+                        for nt, item in zip(nucleotides, coverage_results)
+                    }
+
+                    # Calculate total coverage
+                    total_coverage = sum(coverage_data.values())
+
+                    # Calculate frequency for the target nucleotide
+                    frequency = coverage_data.get(target_symbol, 0) / total_coverage if total_coverage > 0 else 0
+
+                    # Append the result for this mutation
+                    combined_results.append({
+                        "mutation": mutation,
+                        "coverage": total_coverage,
+                        "frequency": frequency,
+                        "counts": coverage_data
+                    })
+
+                    # Stratify results by sampling_date
+                    stratified_results = {}
+                    for nt, item in zip(nucleotides, coverage_results):
+                        for entry in item['data']:
+                            date = entry['sampling_date']
+                            count = entry['count']
+                            if date not in stratified_results:
+                                stratified_results[date] = {"counts": {n: 0 for n in nucleotides}, "coverage": 0}
+                            stratified_results[date]["counts"][nt] += count
+                            stratified_results[date]["coverage"] += count
+                else:
+                    logging.error(f"Unknown mutation type: {mutation_type}")
+                    raise NotImplementedError(f"Unknown mutation type: {mutation_type}")
 
                 # Calculate frequency for the target nucleotide on each date
                 for date, data in stratified_results.items():
-                    data["frequency"] = data["counts"].get(target_nucleotide, 0) / data["coverage"] if data["coverage"] > 0 else 0
+                    data["frequency"] = data["counts"].get(target_symbol, 0) / data["coverage"] if data["coverage"] > 0 else 0
 
                 # Append the stratified result for this mutation, ensuring NA for frequency and count if coverage is zero
                 combined_results[-1]["stratified"] = [
@@ -146,7 +191,7 @@ class WiseLoculusLapis(Lapis):
                         "sampling_date": date,
                         "coverage": data["coverage"],
                         "frequency": data["frequency"] if data["coverage"] > 0 else "NA",
-                        "count": data["counts"].get(target_nucleotide, 0) if data["coverage"] > 0 else "NA"
+                        "count": data["counts"].get(target_symbol, 0) if data["coverage"] > 0 else "NA"
                     }
                     for date, data in stratified_results.items()
                 ]
