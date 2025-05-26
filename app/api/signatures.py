@@ -13,9 +13,34 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Constants
-GITHUB_API_URL = "https://api.github.com/repos/cbg-ethz/cowwid/contents/voc"
-RAW_CONTENT_URL = "https://raw.githubusercontent.com/cbg-ethz/cowwid/master/voc"
+# Load configuration from config.yaml
+def load_config() -> Dict[str, Any]:
+    """Load configuration from config.yaml."""
+    # Try multiple potential config locations
+    config_paths = [
+        Path("app/config.yaml"),      # When running from repository root
+        Path("config.yaml"),          # When running from inside app directory
+        Path("../config.yaml")        # When running from inside app/api directory
+    ]
+    
+    for config_path in config_paths:
+        if config_path.exists():
+            logger.info(f"Loading config from {config_path.absolute()}")
+            with open(config_path, 'r') as f:
+                return yaml.safe_load(f)
+    
+    logger.warning("Config file not found. Using default values.")
+    return {}
+
+config = load_config()
+
+# Get URLs from config or use defaults
+GITHUB_API_URL = config.get("curated_variant_definitions", {}).get(
+    "github_api_url", "https://api.github.com/repos/cbg-ethz/cowwid/contents/voc"
+)
+RAW_CONTENT_URL = config.get("curated_variant_definitions", {}).get(
+    "raw_content_url", "https://raw.githubusercontent.com/cbg-ethz/cowwid/master/voc"
+)
 LOCAL_CACHE_DIR = Path("data/known_variants")
 
 class Mutation(BaseModel): 

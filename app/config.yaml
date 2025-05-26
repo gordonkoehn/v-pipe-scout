@@ -1,3 +1,7 @@
 server:
   lapis_address: "http://88.198.54.174:80"
   cov_sprectrum_api: "https://lapis.cov-spectrum.org"
+
+curated_variant_definitions:
+  github_api_url: "https://api.github.com/repos/cbg-ethz/cowwid/contents/voc"
+  raw_content_url: "https://raw.githubusercontent.com/cbg-ethz/cowwid/master/voc"
