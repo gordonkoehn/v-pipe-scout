@@ -167,7 +167,7 @@ def app():
         "Select known variants of interest – curated by the V-Pipe team",
         options=available_variants,
         default=AbundanceEstimatorState.get_selected_curated_names(),
-        help="Select from the list of known variants. The signature mutations of these variants have been curated by the V-Pipe team (see https://github.com/cbg-ethz/cowwid/tree/master/voc)"
+        help="Select from the list of known variants. The signature mutations of these variants have been curated by the V-Pipe team"
     )
     
     # Update the session state if the selection has changed
