@@ -75,6 +75,95 @@ class WiseLoculusLapis(Lapis):
             return await asyncio.gather(*tasks)
         
 
+    def _get_symbols_for_mutation_type(self, mutation_type: str) -> List[str]:
+        """Returns the list of symbols (amino acids or nucleotides) for the given mutation type."""
+        if mutation_type == "aminoAcid":
+            return ["A", "C", "D", "E", "F", "G", "H", "I", "K", 
+                    "L", "M", "N", "P", "Q", "R", "S", "T", 
+                    "V", "W", "Y"]
+        elif mutation_type == "nucleotide":
+            return ['A', 'T', 'C', 'G']
+        else:
+            raise ValueError(f"Unknown mutation type: {mutation_type}")
+
+    async def _fetch_coverage_for_mutation(
+            self, 
+            session: aiohttp.ClientSession,
+            mutation: str,
+            mutation_type: str,
+            date_range: Tuple[datetime, datetime],
+            location_name: Optional[str]
+        ) -> Tuple[dict[str, int], dict[str, dict]]:
+        """
+        Fetches coverage data for all possible symbols at a mutation position.
+        Returns (coverage_data, stratified_results).
+        """
+        symbols = self._get_symbols_for_mutation_type(mutation_type)
+        mutation_base = mutation[:-1]  # Everything except the last character
+        
+        # Fetch data for all possible symbols at this position
+        coverage_tasks = [
+            self.fetch_sample_aggregated(session, f"{mutation_base}{symbol}", mutation_type, date_range, location_name)
+            for symbol in symbols
+        ]
+        coverage_results = await asyncio.gather(*coverage_tasks)
+
+        # Parse coverage_results to extract total counts for each symbol
+        coverage_data = {
+            symbol: sum(entry['count'] for entry in item['data']) if item['data'] else 0
+            for symbol, item in zip(symbols, coverage_results)
+        }
+
+        # Stratify results by sampling_date
+        stratified_results = {}
+        for symbol, item in zip(symbols, coverage_results):
+            if item['data']:
+                for entry in item['data']:
+                    date = entry['sampling_date']
+                    count = entry['count']
+                    if date not in stratified_results:
+                        stratified_results[date] = {"counts": {s: 0 for s in symbols}, "coverage": 0}
+                    stratified_results[date]["counts"][symbol] += count
+                    stratified_results[date]["coverage"] += count
+
+        return coverage_data, stratified_results
+
+    def _calculate_mutation_result(
+            self, 
+            mutation: str, 
+            coverage_data: dict[str, int], 
+            stratified_results: dict[str, dict]
+        ) -> dict[str, Any]:
+        """
+        Calculates the final result for a mutation including overall and stratified statistics.
+        """
+        target_symbol = mutation[-1]
+        total_coverage = sum(coverage_data.values())
+        frequency = coverage_data.get(target_symbol, 0) / total_coverage if total_coverage > 0 else 0
+
+        # Calculate frequency for the target symbol on each date
+        for date, data in stratified_results.items():
+            data["frequency"] = data["counts"].get(target_symbol, 0) / data["coverage"] if data["coverage"] > 0 else 0
+
+        # Build stratified data with proper NA handling
+        stratified_data = [
+            {
+                "sampling_date": date,
+                "coverage": data["coverage"],
+                "frequency": data["frequency"] if data["coverage"] > 0 else "NA",
+                "count": data["counts"].get(target_symbol, 0) if data["coverage"] > 0 else "NA"
+            }
+            for date, data in stratified_results.items()
+        ]
+
+        return {
+            "mutation": mutation,
+            "coverage": total_coverage,
+            "frequency": frequency,
+            "counts": coverage_data,
+            "stratified": stratified_data
+        }
+
     async def fetch_mutation_counts_and_coverage(
             self, 
             mutations: List[str], 
@@ -84,72 +173,25 @@ class WiseLoculusLapis(Lapis):
         ) -> List[dict[str, Any]]:
         """
         Fetches the mutation counts and coverage for a list of mutations, specifying their type and optional location.
-        """
 
-        if mutation_type not in ["nucleotide"]:
+        Note Amino Acid mutations require gene:change name "ORF1a:V3449I" while nucleotide mutations can be in the form "A123T".
+        """
+        if mutation_type not in ["nucleotide", "aminoAcid"]:
             logging.error(f"Unknown mutation type: {mutation_type}")
             raise NotImplementedError(f"Unknown mutation type: {mutation_type}")
-
+        
         async with aiohttp.ClientSession() as session:
             combined_results = []
 
             for mutation in mutations:
-                # Extract the target nucleotide from the mutation (e.g., A456T -> T)
-                target_nucleotide = mutation[-1]
-
-                # Fetch counts for A, T, C, G at the mutation's position
-                nucleotides = ['A', 'T', 'C', 'G']
-                coverage_tasks = [
-                    self.fetch_sample_aggregated(session, f"{mutation[:-1]}{nt}", "nucleotide", date_range, location_name)
-                    for nt in nucleotides
-                ]
-                coverage_results = await asyncio.gather(*coverage_tasks)
-
-                # Parse coverage_results to extract counts for each nucleotide
-                coverage_data = {
-                    nt: sum(entry['count'] for entry in item['data']) if item['data'] else 0
-                    for nt, item in zip(nucleotides, coverage_results)
-                }
-
-                # Calculate total coverage
-                total_coverage = sum(coverage_data.values())
-
-                # Calculate frequency for the target nucleotide
-                frequency = coverage_data.get(target_nucleotide, 0) / total_coverage if total_coverage > 0 else 0
-
-                # Append the result for this mutation
-                combined_results.append({
-                    "mutation": mutation,
-                    "coverage": total_coverage,
-                    "frequency": frequency,
-                    "counts": coverage_data
-                })
-
-                # Stratify results by sampling_date
-                stratified_results = {}
-                for nt, item in zip(nucleotides, coverage_results):
-                    for entry in item['data']:
-                        date = entry['sampling_date']
-                        count = entry['count']
-                        if date not in stratified_results:
-                            stratified_results[date] = {"counts": {n: 0 for n in nucleotides}, "coverage": 0}
-                        stratified_results[date]["counts"][nt] += count
-                        stratified_results[date]["coverage"] += count
-
-                # Calculate frequency for the target nucleotide on each date
-                for date, data in stratified_results.items():
-                    data["frequency"] = data["counts"].get(target_nucleotide, 0) / data["coverage"] if data["coverage"] > 0 else 0
-
-                # Append the stratified result for this mutation, ensuring NA for frequency and count if coverage is zero
-                combined_results[-1]["stratified"] = [
-                    {
-                        "sampling_date": date,
-                        "coverage": data["coverage"],
-                        "frequency": data["frequency"] if data["coverage"] > 0 else "NA",
-                        "count": data["counts"].get(target_nucleotide, 0) if data["coverage"] > 0 else "NA"
-                    }
-                    for date, data in stratified_results.items()
-                ]
+                # Fetch coverage data for all possible symbols at this position
+                coverage_data, stratified_results = await self._fetch_coverage_for_mutation(
+                    session, mutation, mutation_type, date_range, location_name
+                )
+                
+                # Calculate and append the result for this mutation
+                mutation_result = self._calculate_mutation_result(mutation, coverage_data, stratified_results)
+                combined_results.append(mutation_result)
 
             return combined_results
         
