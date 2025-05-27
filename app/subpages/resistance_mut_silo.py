@@ -23,9 +23,9 @@ server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:800
 wiseLoculus = WiseLoculusLapis(server_ip)
 
 
-def fetch_reformat_data(formatted_mutations, date_range):
+def fetch_reformat_data(formatted_mutations, date_range, location=None):
     mutation_type = "aminoAcid"  # as we care about amino acid mutations, as in resistance mutations
-    all_data = asyncio.run(wiseLoculus.fetch_mutation_counts(formatted_mutations,mutation_type, date_range))
+    all_data = asyncio.run(wiseLoculus.fetch_mutation_counts(formatted_mutations,mutation_type, date_range, location))
 
     # get dates from date_range
     dates = pd.date_range(date_range[0], date_range[1]).strftime('%Y-%m-%d')
@@ -150,10 +150,19 @@ def app():
         st.error("Please select a valid date range with a start and end date.")
         return
 
+    ## Add a horizontal line
+    st.markdown("---")
+
+    ## Fetch locations from API
+    default_locations = ["Zürich (ZH)", "Lugano (TI)", "Chur (GR)"] # Define default locations
+    # Fetch locations using the fetch_locations function
+    locations = wiseLoculus.fetch_locations(default_locations)
+
+    location = st.selectbox("Select Location:", locations)
+    
     start_date = date_range[0].strftime('%Y-%m-%d')
     end_date = date_range[1].strftime('%Y-%m-%d')
 
-    location = "Zürich (ZH)"
     sequence_type_value = "amino acid"
 
     formatted_mutations_str = str(formatted_mutations).replace("'", '"')
@@ -169,7 +178,7 @@ def app():
         index=0  # Default to showing all dates (off)
     )
 
-    mutaton_counts_df = fetch_reformat_data(formatted_mutations, date_range)
+    mutaton_counts_df = fetch_reformat_data(formatted_mutations, date_range, location)
 
     # Only skip NA dates if the option is selected
     if show_empty_dates == "Skip dates with no coverage":
