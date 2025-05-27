@@ -89,12 +89,12 @@ class VariantList(BaseModel):
 
 
 @st.cache_data(ttl=3600)  # Cache for 1 hour
-def cached_get_variant_list():
+def cached_get_variant_list() -> SignatureVariantList:
     """Cached version of get_variant_list to avoid repeated API calls."""
     return get_variant_list()
 
 @st.cache_data(ttl=3600)  # Cache for 1 hour
-def cached_get_variant_names():
+def cached_get_variant_names() -> List[str]:
     """Cached version of get_variant_names to avoid repeated API calls."""
     return get_variant_names()
 
