@@ -34,12 +34,25 @@ def load_config() -> Dict[str, Any]:
 
 config = load_config()
 
-# Get URLs from config or use defaults
-GITHUB_API_URL = config.get("curated_variant_definitions", {}).get(
-    "github_api_url", "https://api.github.com/repos/cbg-ethz/cowwid/contents/voc"
+# Get GitHub repository details from config
+variant_config = config.get("curated_variant_definitions", {})
+DEFAULT_GITHUB_REPO = "cbg-ethz/cowwid"
+DEFAULT_GITHUB_BRANCH = "master"
+DEFAULT_GITHUB_PATH = "voc"
+
+# If we have the new config format with separate components
+github_repo = variant_config.get("github_repo", DEFAULT_GITHUB_REPO)
+github_branch = variant_config.get("github_branch", DEFAULT_GITHUB_BRANCH)
+github_path = variant_config.get("github_path", DEFAULT_GITHUB_PATH)
+
+# Support for the old config format for backward compatibility
+GITHUB_API_URL = variant_config.get(
+    "github_api_url", 
+    f"https://api.github.com/repos/{github_repo}/contents/{github_path}"
 )
-RAW_CONTENT_URL = config.get("curated_variant_definitions", {}).get(
-    "raw_content_url", "https://raw.githubusercontent.com/cbg-ethz/cowwid/master/voc"
+RAW_CONTENT_URL = variant_config.get(
+    "raw_content_url", 
+    f"https://raw.githubusercontent.com/{github_repo}/{github_branch}/{github_path}"
 )
 LOCAL_CACHE_DIR = Path("data/known_variants")
 
