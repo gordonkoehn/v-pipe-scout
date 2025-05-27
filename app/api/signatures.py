@@ -13,9 +13,37 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Constants
-GITHUB_API_URL = "https://api.github.com/repos/cbg-ethz/cowwid/contents/voc"
-RAW_CONTENT_URL = "https://raw.githubusercontent.com/cbg-ethz/cowwid/master/voc"
+# Load configuration from config.yaml
+def load_config() -> Dict[str, Any]:
+    """Load configuration from config.yaml."""
+    # Try multiple potential config locations
+    config_paths = [
+        Path("app/config.yaml"),      # When running from repository root
+        Path("config.yaml"),          # When running from inside app directory
+        Path("../config.yaml")        # When running from inside app/api directory
+    ]
+    
+    for config_path in config_paths:
+        if config_path.exists():
+            logger.info(f"Loading config from {config_path.absolute()}")
+            with open(config_path, 'r') as f:
+                return yaml.safe_load(f)
+    
+    logger.warning("Config file not found. Using default values.")
+    return {}
+
+config = load_config()
+
+# Get GitHub URL from config
+variant_config = config.get("curated_variant_definitions", {})
+
+# Default GitHub URL
+DEFAULT_GITHUB_URL = "https://github.com/cbg-ethz/cowwid/tree/master/voc"
+# Get the GitHub URL from config with fallback to default
+GITHUB_URL = variant_config.get("github_url", DEFAULT_GITHUB_URL)
+
+
+
 LOCAL_CACHE_DIR = Path("data/known_variants")
 
 class Mutation(BaseModel): 
@@ -226,10 +254,50 @@ def ensure_cache_dir() -> None:
     """Ensure that the local cache directory exists."""
     os.makedirs(LOCAL_CACHE_DIR, exist_ok=True)
 
+def _parse_github_url(github_url: str) -> dict:
+    """Parse GitHub URL into components needed for API and raw content access."""
+    # Default values
+    result = {
+        "owner": "cbg-ethz",
+        "repo": "cowwid",
+        "branch": "master",
+        "path": "voc"
+    }
+    
+    try:
+        # Extract owner/repo from github URL
+        if "github.com" in github_url:
+            # Extract owner and repo from URL
+            url_parts = github_url.split("github.com/")[-1].split("/")
+            
+            if len(url_parts) >= 2:
+                result["owner"] = url_parts[0]
+                result["repo"] = url_parts[1]
+            
+            # Extract branch and path if present
+            if len(url_parts) >= 4 and url_parts[2] in ["tree", "blob"]:
+                result["branch"] = url_parts[3]
+                if len(url_parts) >= 5:
+                    result["path"] = "/".join(url_parts[4:])
+    except Exception as e:
+        logger.warning(f"Error parsing GitHub URL {github_url}: {e}. Using default values.")
+        
+    return result
+
 def list_github_files() -> List[Dict[str, Any]]:
     """List all YAML files in the GitHub repository's VOC folder."""
     try:
-        response = requests.get(GITHUB_API_URL)
+        # Parse GitHub URL components
+        github_components = _parse_github_url(GITHUB_URL)
+        owner = github_components["owner"]
+        repo = github_components["repo"]
+        path = github_components["path"]
+        
+        # Construct API URL
+        api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
+        
+        logger.info(f"Fetching files from GitHub API: {api_url}")
+        response = requests.get(api_url)
         response.raise_for_status()
         
         # Filter for YAML files only
@@ -255,9 +323,18 @@ def download_yaml_file(file_name: str) -> Optional[Dict[str, Any]]:
     
     # If not in cache or error occurred, download from GitHub
     try:
-        url = f"{RAW_CONTENT_URL}/{file_name}"
-        logger.info(f"Downloading {file_name} from {url}")
-        response = requests.get(url)
+        # Parse GitHub URL components
+        github_components = _parse_github_url(GITHUB_URL)
+        owner = github_components["owner"]
+        repo = github_components["repo"]
+        branch = github_components["branch"]
+        path = github_components["path"]
+        
+        # Construct raw content URL
+        raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}/{file_name}"
+        
+        logger.info(f"Downloading {file_name} from {raw_url}")
+        response = requests.get(raw_url)
         response.raise_for_status()
         
         # Parse the YAML content
