@@ -225,24 +225,25 @@ def app():
         height=500,
     )
 
-    st.markdown("---")
-    # Add a button to trigger fetching
-    if st.button("Fetch Data"):
+    # st.markdown("---")
+    # # Add a button to trigger fetching
+    # if st.button("Fetch Data"):
         
-        with st.spinner('Fetching mutation counts and coverage data...'):
-            # Store the result in session state
-            st.session_state.counts_df3d = wiseLoculus.fetch_counts_coverage_freq(
-            formatted_mutations,
-            MutationType.AMINO_ACID, 
-            date_range,
-            location
-            )
-        st.success("Data fetched successfully!")
-        # Display the DataFrame
-        st.write("### Mutation Counts and Coverage Data")
-        if 'counts_df3d' in st.session_state:
-            st.dataframe(st.session_state.counts_df3d)
-        else:
-            st.warning("No data available. Please fetch the data first.")
+    #     with st.spinner('Fetching mutation counts and coverage data...'):
+    #         # Store the result in session state
+    #         st.session_state.counts_df3d = wiseLoculus.fetch_counts_coverage_freq(
+    #         formatted_mutations,
+    #         MutationType.AMINO_ACID, 
+    #         date_range,
+    #         location
+    #         )
+    #     st.success("Data fetched successfully!")
+    #     # Display the DataFrame
+    #     st.write("### Mutation Counts and Coverage Data")
+    #     if 'counts_df3d' in st.session_state:
+    #         st.dataframe(st.session_state.counts_df3d)
+    #     else:
+    #         st.warning("No data available. Please fetch the data first.")
+
 if __name__ == "__main__":
     app()
