@@ -94,7 +94,7 @@ class TestWiseLoculusLapis:
         
         # Test invalid mutation type
         with pytest.raises(ValueError, match="Unknown mutation type: invalid"):
-            self.api._get_symbols_for_mutation_type("invalid")
+            self.api._get_symbols_for_mutation_type("invalid") # pyright: ignore[reportArgumentType]
 
 
 if __name__ == "__main__":

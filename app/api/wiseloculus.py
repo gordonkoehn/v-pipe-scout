@@ -65,13 +65,17 @@ class WiseLoculusLapis(Lapis):
     async def fetch_mutation_counts(
             self, 
             mutations: List[str], 
-            mutation_type: str, 
+            mutation_type: MutationType, 
             date_range: Tuple[datetime, datetime], 
             location_name: Optional[str] = None
             ) -> List[dict[str, Any]]:
         """
         Fetches the mutation counts for a list of mutations, specifying their type and optional location.
         """
+        # validate mutation_type
+        if mutation_type not in [MutationType.AMINO_ACID, MutationType.NUCLEOTIDE]:
+            raise ValueError(f"Unsupported mutation type: {mutation_type}")
+
         async with aiohttp.ClientSession() as session:
             tasks = [self.fetch_sample_aggregated(session, m, mutation_type, date_range, location_name) for m in mutations]
             return await asyncio.gather(*tasks)
@@ -79,6 +83,7 @@ class WiseLoculusLapis(Lapis):
 
     def _get_symbols_for_mutation_type(self, mutation_type: MutationType) -> List[str]:
         """Returns the list of symbols (amino acids or nucleotides) for the given mutation type."""
+
         if mutation_type == MutationType.AMINO_ACID:
             return ["A", "C", "D", "E", "F", "G", "H", "I", "K", 
                     "L", "M", "N", "P", "Q", "R", "S", "T", 
