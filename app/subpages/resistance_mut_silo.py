@@ -184,7 +184,8 @@ def app():
     mutations = df['Mutation'].tolist()
     # Apply the lambda function to each element in the mutations list
     formatted_mutations = mutations
-    
+
+    st.markdown("---")
     # Allow the user to choose a date range
     st.write("Select a date range:")
     date_range = st.date_input("Select a date range:", [pd.to_datetime("2025-02-10"), pd.to_datetime("2025-03-08")])
@@ -196,8 +197,17 @@ def app():
 
     start_date = date_range[0].strftime('%Y-%m-%d')
     end_date = date_range[1].strftime('%Y-%m-%d')
+    
 
-    location = "Zürich (ZH)"
+    ## Fetch locations from API
+    default_locations = [
+        "Zürich (ZH)",
+    ]  # Define default locations
+    # Fetch locations using the fetch_locations function
+    locations = wiseLoculus.fetch_locations(default_locations)
+
+    location = st.selectbox("Select Location:", locations)
+    
     sequence_type_value = "amino acid"
 
     formatted_mutations_str = str(formatted_mutations).replace("'", '"')
@@ -205,7 +215,7 @@ def app():
     st.markdown("---")
     st.write("### Resistance Mutations Over Time")
     st.write("Shows the mutations over time in wastewater for the selected date range.")
-    st.info("📊 **Enhanced Data**: Hover over the heatmap cells to see detailed information including mutation counts, coverage (total reads at position), and proportion (percentage of the specific mutation).")
+    st.info("📊 **New: Enhanced with Coverage** – Hover over the heatmap cells to see detailed information including mutation counts, coverage (total reads at position), and proportion (percentage of the specific mutation).")
 
     # Add radio button for showing/hiding dates with no data
     show_empty_dates = st.radio(
