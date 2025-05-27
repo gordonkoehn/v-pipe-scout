@@ -94,3 +94,30 @@ class TestWiseLoculusLapis:
         # Test invalid mutation type
         with pytest.raises(ValueError, match="Unknown mutation type: invalid"):
             self.api._get_symbols_for_mutation_type("invalid")
+
+
+if __name__ == "__main__":
+
+    ### testing if the amino acid coverage works with real server data.
+    
+    import yaml
+    import pathlib
+    import asyncio
+
+    async def main():
+        CONFIG_PATH = pathlib.Path(__file__).parent.parent / "config.yaml"
+        with open(CONFIG_PATH, 'r') as file:
+            config = yaml.safe_load(file)
+        server_ip = config.get('server', {}).get('lapis_address', 'http://default_ip:8000')
+        wiseLoculus = WiseLoculusLapis(server_ip)
+
+        result = await wiseLoculus.fetch_mutation_counts_and_coverage(
+            mutations=["ORF1a:V3449I"],
+            mutation_type="aminoAcid",
+            location_name="Zürich (ZH)",
+            date_range=(datetime(2025, 2, 2), datetime(2025, 3, 3))
+        )
+
+        print(result)
+
+    asyncio.run(main())

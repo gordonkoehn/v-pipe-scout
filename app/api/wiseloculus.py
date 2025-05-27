@@ -173,6 +173,8 @@ class WiseLoculusLapis(Lapis):
         ) -> List[dict[str, Any]]:
         """
         Fetches the mutation counts and coverage for a list of mutations, specifying their type and optional location.
+
+        Note Amino Acid mutaitons require gene:change name "ORF1a:V3449I" while nucleotide mutations can be in the form "A123T".
         """
         if mutation_type not in ["nucleotide", "aminoAcid"]:
             logging.error(f"Unknown mutation type: {mutation_type}")
