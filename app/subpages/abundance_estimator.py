@@ -26,7 +26,7 @@ import base64
 from celery import Celery
 import redis
 
-
+from interface import MutationType
 from api.signatures import get_variant_list, get_variant_names
 from api.signatures import Mutation
 from api.covspectrum import CovSpectrumLapis
@@ -820,8 +820,9 @@ def app():
                 
                 with st.spinner('Fetching mutation counts and coverage data...'):
                     # Store the result in session state
-                    st.session_state.counts_df3d = wiseLoculus.fetch_counts_and_coverage_3D_df_nuc(
+                    st.session_state.counts_df3d = wiseLoculus.fetch_counts_coverage_freq(
                     mutations,
+                    MutationType.NUCLEOTIDE,  
                     date_range,
                     location
                     )

@@ -1,4 +1,3 @@
-from matplotlib import pyplot as plt
 import numpy as np
 import streamlit as st
 import pandas as pd
@@ -8,6 +7,7 @@ import streamlit.components.v1 as components
 import plotly.graph_objects as go 
 import pathlib
 
+from interface import MutationType
 from api.wiseloculus import WiseLoculusLapis
 
 pd.set_option('future.no_silent_downcasting', True)
@@ -225,5 +225,24 @@ def app():
         height=500,
     )
 
+    st.markdown("---")
+    # Add a button to trigger fetching
+    if st.button("Fetch Data"):
+        
+        with st.spinner('Fetching mutation counts and coverage data...'):
+            # Store the result in session state
+            st.session_state.counts_df3d = wiseLoculus.fetch_counts_coverage_freq(
+            formatted_mutations,
+            MutationType.AMINO_ACID, 
+            date_range,
+            location
+            )
+        st.success("Data fetched successfully!")
+        # Display the DataFrame
+        st.write("### Mutation Counts and Coverage Data")
+        if 'counts_df3d' in st.session_state:
+            st.dataframe(st.session_state.counts_df3d)
+        else:
+            st.warning("No data available. Please fetch the data first.")
 if __name__ == "__main__":
     app()
