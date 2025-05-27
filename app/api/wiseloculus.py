@@ -3,12 +3,14 @@
 import logging
 import aiohttp
 import asyncio
-from typing import Optional, List, Tuple, Any 
+from typing import Optional, List, Tuple, Any  
 from datetime import datetime
 
 import pandas as pd
 
 from .lapis import Lapis
+from interface import MutationType
+
 
 
 class WiseLoculusLapis(Lapis):
@@ -18,7 +20,7 @@ class WiseLoculusLapis(Lapis):
             self,
             session: aiohttp.ClientSession, 
             mutation: str, 
-            mutation_type: str, 
+            mutation_type: MutationType, 
             date_range: Tuple[datetime, datetime], 
             location_name: Optional[str] = None
             ) -> dict[str, Any]:
@@ -31,9 +33,9 @@ class WiseLoculusLapis(Lapis):
             "fields": ["sampling_date"]  
         }
 
-        if mutation_type == "aminoAcid":
+        if mutation_type == MutationType.AMINO_ACID:
             payload["aminoAcidMutations"] = [mutation]
-        elif mutation_type == "nucleotide":
+        elif mutation_type == MutationType.NUCLEOTIDE:
             payload["nucleotideMutations"] = [mutation]
         else:
             logging.error(f"Unknown mutation type: {mutation_type}")
@@ -63,25 +65,30 @@ class WiseLoculusLapis(Lapis):
     async def fetch_mutation_counts(
             self, 
             mutations: List[str], 
-            mutation_type: str, 
+            mutation_type: MutationType, 
             date_range: Tuple[datetime, datetime], 
             location_name: Optional[str] = None
             ) -> List[dict[str, Any]]:
         """
         Fetches the mutation counts for a list of mutations, specifying their type and optional location.
         """
+        # validate mutation_type
+        if mutation_type not in [MutationType.AMINO_ACID, MutationType.NUCLEOTIDE]:
+            raise ValueError(f"Unsupported mutation type: {mutation_type}")
+
         async with aiohttp.ClientSession() as session:
             tasks = [self.fetch_sample_aggregated(session, m, mutation_type, date_range, location_name) for m in mutations]
             return await asyncio.gather(*tasks)
         
 
-    def _get_symbols_for_mutation_type(self, mutation_type: str) -> List[str]:
+    def _get_symbols_for_mutation_type(self, mutation_type: MutationType) -> List[str]:
         """Returns the list of symbols (amino acids or nucleotides) for the given mutation type."""
-        if mutation_type == "aminoAcid":
+
+        if mutation_type == MutationType.AMINO_ACID:
             return ["A", "C", "D", "E", "F", "G", "H", "I", "K", 
                     "L", "M", "N", "P", "Q", "R", "S", "T", 
                     "V", "W", "Y"]
-        elif mutation_type == "nucleotide":
+        elif mutation_type == MutationType.NUCLEOTIDE:
             return ['A', 'T', 'C', 'G']
         else:
             raise ValueError(f"Unknown mutation type: {mutation_type}")
@@ -90,7 +97,7 @@ class WiseLoculusLapis(Lapis):
             self, 
             session: aiohttp.ClientSession,
             mutation: str,
-            mutation_type: str,
+            mutation_type: MutationType,
             date_range: Tuple[datetime, datetime],
             location_name: Optional[str]
         ) -> Tuple[dict[str, int], dict[str, dict]]:
@@ -167,7 +174,7 @@ class WiseLoculusLapis(Lapis):
     async def fetch_mutation_counts_and_coverage(
             self, 
             mutations: List[str], 
-            mutation_type: str, 
+            mutation_type: MutationType, 
             date_range: Tuple[datetime, datetime], 
             location_name: Optional[str] = None
         ) -> List[dict[str, Any]]:
@@ -176,10 +183,7 @@ class WiseLoculusLapis(Lapis):
 
         Note Amino Acid mutations require gene:change name "ORF1a:V3449I" while nucleotide mutations can be in the form "A123T".
         """
-        if mutation_type not in ["nucleotide", "aminoAcid"]:
-            logging.error(f"Unknown mutation type: {mutation_type}")
-            raise NotImplementedError(f"Unknown mutation type: {mutation_type}")
-        
+  
         async with aiohttp.ClientSession() as session:
             combined_results = []
 
@@ -196,7 +200,7 @@ class WiseLoculusLapis(Lapis):
             return combined_results
         
     
-    def fetch_counts_and_coverage_3D_df_nuc(self, mutations, date_range, location_name) -> pd.DataFrame:
+    def fetch_counts_coverage_freq(self, mutations, mutation_type : MutationType, date_range, location_name) -> pd.DataFrame:
         """Fetches mutation counts, coverage, and frequency for a list of nucleotide mutations over a date range.
 
         Args:
@@ -206,7 +210,7 @@ class WiseLoculusLapis(Lapis):
         Returns:
             pd.DataFrame: A MultiIndex DataFrame with mutation and sampling_date as the index, and count, coverage, and frequency as columns.
         """
-        mutation_type = "nucleotide"
+
         all_data = asyncio.run(self.fetch_mutation_counts_and_coverage(mutations, mutation_type, date_range, location_name))
 
         # Flatten the data into a list of records

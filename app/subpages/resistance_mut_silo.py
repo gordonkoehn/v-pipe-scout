@@ -1,4 +1,3 @@
-from matplotlib import pyplot as plt
 import numpy as np
 import streamlit as st
 import pandas as pd
@@ -8,6 +7,7 @@ import streamlit.components.v1 as components
 import plotly.graph_objects as go 
 import pathlib
 
+from interface import MutationType
 from api.wiseloculus import WiseLoculusLapis
 
 pd.set_option('future.no_silent_downcasting', True)
@@ -24,8 +24,8 @@ wiseLoculus = WiseLoculusLapis(server_ip)
 
 
 def fetch_reformat_data(formatted_mutations, date_range):
-    mutation_type = "aminoAcid"  # as we care about amino acid mutations, as in resistance mutations
-    all_data = asyncio.run(wiseLoculus.fetch_mutation_counts(formatted_mutations,mutation_type, date_range))
+    mutation_type = MutationType.AMINO_ACID  # as we care about amino acid mutations, as in resistance mutations
+    all_data = asyncio.run(wiseLoculus.fetch_mutation_counts(formatted_mutations, mutation_type, date_range))
 
     # get dates from date_range
     dates = pd.date_range(date_range[0], date_range[1]).strftime('%Y-%m-%d')
@@ -224,6 +224,26 @@ def app():
     """,
         height=500,
     )
+
+    # st.markdown("---")
+    # # Add a button to trigger fetching
+    # if st.button("Fetch Data"):
+        
+    #     with st.spinner('Fetching mutation counts and coverage data...'):
+    #         # Store the result in session state
+    #         st.session_state.counts_df3d = wiseLoculus.fetch_counts_coverage_freq(
+    #         formatted_mutations,
+    #         MutationType.AMINO_ACID, 
+    #         date_range,
+    #         location
+    #         )
+    #     st.success("Data fetched successfully!")
+    #     # Display the DataFrame
+    #     st.write("### Mutation Counts and Coverage Data")
+    #     if 'counts_df3d' in st.session_state:
+    #         st.dataframe(st.session_state.counts_df3d)
+    #     else:
+    #         st.warning("No data available. Please fetch the data first.")
 
 if __name__ == "__main__":
     app()

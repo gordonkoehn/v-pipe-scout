@@ -9,6 +9,7 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from api.wiseloculus import WiseLoculusLapis
+from interface import MutationType
 
 
 class TestWiseLoculusLapis:
@@ -36,7 +37,7 @@ class TestWiseLoculusLapis:
         with patch.object(self.api, 'fetch_sample_aggregated', side_effect=mock_fetch_sample_aggregated):
             result = await self.api.fetch_mutation_counts_and_coverage(
                 mutations=["A123T"],
-                mutation_type="nucleotide",
+                mutation_type=MutationType.NUCLEOTIDE,
                 date_range=self.date_range
             )
         
@@ -66,7 +67,7 @@ class TestWiseLoculusLapis:
         with patch.object(self.api, 'fetch_sample_aggregated', side_effect=mock_fetch_sample_aggregated):
             result = await self.api.fetch_mutation_counts_and_coverage(
                 mutations=["A123T"],
-                mutation_type="nucleotide",
+                mutation_type=MutationType.NUCLEOTIDE,
                 date_range=self.date_range
             )
         
@@ -82,10 +83,10 @@ class TestWiseLoculusLapis:
 
     def test_get_symbols_for_mutation_type(self):
         """Test _get_symbols_for_mutation_type helper method."""
-        nucleotides = self.api._get_symbols_for_mutation_type("nucleotide")
+        nucleotides = self.api._get_symbols_for_mutation_type(MutationType.NUCLEOTIDE)
         assert nucleotides == ['A', 'T', 'C', 'G']
         
-        amino_acids = self.api._get_symbols_for_mutation_type("aminoAcid")
+        amino_acids = self.api._get_symbols_for_mutation_type(MutationType.AMINO_ACID)
         expected_amino_acids = ["A", "C", "D", "E", "F", "G", "H", "I", "K", 
                                "L", "M", "N", "P", "Q", "R", "S", "T", 
                                "V", "W", "Y"]
@@ -93,13 +94,13 @@ class TestWiseLoculusLapis:
         
         # Test invalid mutation type
         with pytest.raises(ValueError, match="Unknown mutation type: invalid"):
-            self.api._get_symbols_for_mutation_type("invalid")
+            self.api._get_symbols_for_mutation_type("invalid") # pyright: ignore[reportArgumentType]
 
 
 if __name__ == "__main__":
 
     ### testing if the amino acid coverage works with real server data.
-    
+
     import yaml
     import pathlib
     import asyncio
@@ -113,7 +114,7 @@ if __name__ == "__main__":
 
         result = await wiseLoculus.fetch_mutation_counts_and_coverage(
             mutations=["ORF1a:V3449I"],
-            mutation_type="aminoAcid",
+            mutation_type=MutationType.AMINO_ACID,
             location_name="Zürich (ZH)",
             date_range=(datetime(2025, 2, 2), datetime(2025, 3, 3))
         )
