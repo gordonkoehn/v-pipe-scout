@@ -42,12 +42,7 @@ DEFAULT_GITHUB_URL = "https://github.com/cbg-ethz/cowwid/tree/master/voc"
 # Get the GitHub URL from config with fallback to default
 GITHUB_URL = variant_config.get("github_url", DEFAULT_GITHUB_URL)
 
-# For backward compatibility
-if "github_repo" in variant_config and "github_branch" in variant_config and "github_path" in variant_config:
-    github_repo = variant_config.get("github_repo")
-    github_branch = variant_config.get("github_branch")
-    github_path = variant_config.get("github_path")
-    GITHUB_URL = f"https://github.com/{github_repo}/tree/{github_branch}/{github_path}"
+
 
 LOCAL_CACHE_DIR = Path("data/known_variants")
 
@@ -301,10 +296,6 @@ def list_github_files() -> List[Dict[str, Any]]:
         # Construct API URL
         api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
         
-        # Support for the old config format
-        if "github_api_url" in variant_config:
-            api_url = variant_config["github_api_url"]
-        
         logger.info(f"Fetching files from GitHub API: {api_url}")
         response = requests.get(api_url)
         response.raise_for_status()
@@ -341,10 +332,6 @@ def download_yaml_file(file_name: str) -> Optional[Dict[str, Any]]:
         
         # Construct raw content URL
         raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}/{file_name}"
-        
-        # Support for the old config format
-        if "raw_content_url" in variant_config:
-            raw_url = f"{variant_config['raw_content_url']}/{file_name}"
         
         logger.info(f"Downloading {file_name} from {raw_url}")
         response = requests.get(raw_url)
