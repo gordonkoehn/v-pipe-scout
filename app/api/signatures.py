@@ -34,26 +34,21 @@ def load_config() -> Dict[str, Any]:
 
 config = load_config()
 
-# Get GitHub repository details from config
+# Get GitHub URL from config
 variant_config = config.get("curated_variant_definitions", {})
-DEFAULT_GITHUB_REPO = "cbg-ethz/cowwid"
-DEFAULT_GITHUB_BRANCH = "master"
-DEFAULT_GITHUB_PATH = "voc"
 
-# If we have the new config format with separate components
-github_repo = variant_config.get("github_repo", DEFAULT_GITHUB_REPO)
-github_branch = variant_config.get("github_branch", DEFAULT_GITHUB_BRANCH)
-github_path = variant_config.get("github_path", DEFAULT_GITHUB_PATH)
+# Default GitHub URL
+DEFAULT_GITHUB_URL = "https://github.com/cbg-ethz/cowwid/tree/master/voc"
+# Get the GitHub URL from config with fallback to default
+GITHUB_URL = variant_config.get("github_url", DEFAULT_GITHUB_URL)
 
-# Support for the old config format for backward compatibility
-GITHUB_API_URL = variant_config.get(
-    "github_api_url", 
-    f"https://api.github.com/repos/{github_repo}/contents/{github_path}"
-)
-RAW_CONTENT_URL = variant_config.get(
-    "raw_content_url", 
-    f"https://raw.githubusercontent.com/{github_repo}/{github_branch}/{github_path}"
-)
+# For backward compatibility
+if "github_repo" in variant_config and "github_branch" in variant_config and "github_path" in variant_config:
+    github_repo = variant_config.get("github_repo")
+    github_branch = variant_config.get("github_branch")
+    github_path = variant_config.get("github_path")
+    GITHUB_URL = f"https://github.com/{github_repo}/tree/{github_branch}/{github_path}"
+
 LOCAL_CACHE_DIR = Path("data/known_variants")
 
 class Mutation(BaseModel): 
@@ -264,10 +259,54 @@ def ensure_cache_dir() -> None:
     """Ensure that the local cache directory exists."""
     os.makedirs(LOCAL_CACHE_DIR, exist_ok=True)
 
+def _parse_github_url(github_url: str) -> dict:
+    """Parse GitHub URL into components needed for API and raw content access."""
+    # Default values
+    result = {
+        "owner": "cbg-ethz",
+        "repo": "cowwid",
+        "branch": "master",
+        "path": "voc"
+    }
+    
+    try:
+        # Extract owner/repo from github URL
+        if "github.com" in github_url:
+            # Extract owner and repo from URL
+            url_parts = github_url.split("github.com/")[-1].split("/")
+            
+            if len(url_parts) >= 2:
+                result["owner"] = url_parts[0]
+                result["repo"] = url_parts[1]
+            
+            # Extract branch and path if present
+            if len(url_parts) >= 4 and url_parts[2] in ["tree", "blob"]:
+                result["branch"] = url_parts[3]
+                if len(url_parts) >= 5:
+                    result["path"] = "/".join(url_parts[4:])
+    except Exception as e:
+        logger.warning(f"Error parsing GitHub URL {github_url}: {e}. Using default values.")
+        
+    return result
+
 def list_github_files() -> List[Dict[str, Any]]:
     """List all YAML files in the GitHub repository's VOC folder."""
     try:
-        response = requests.get(GITHUB_API_URL)
+        # Parse GitHub URL components
+        github_components = _parse_github_url(GITHUB_URL)
+        owner = github_components["owner"]
+        repo = github_components["repo"]
+        path = github_components["path"]
+        
+        # Construct API URL
+        api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
+        
+        # Support for the old config format
+        if "github_api_url" in variant_config:
+            api_url = variant_config["github_api_url"]
+        
+        logger.info(f"Fetching files from GitHub API: {api_url}")
+        response = requests.get(api_url)
         response.raise_for_status()
         
         # Filter for YAML files only
@@ -293,9 +332,22 @@ def download_yaml_file(file_name: str) -> Optional[Dict[str, Any]]:
     
     # If not in cache or error occurred, download from GitHub
     try:
-        url = f"{RAW_CONTENT_URL}/{file_name}"
-        logger.info(f"Downloading {file_name} from {url}")
-        response = requests.get(url)
+        # Parse GitHub URL components
+        github_components = _parse_github_url(GITHUB_URL)
+        owner = github_components["owner"]
+        repo = github_components["repo"]
+        branch = github_components["branch"]
+        path = github_components["path"]
+        
+        # Construct raw content URL
+        raw_url = f"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}/{file_name}"
+        
+        # Support for the old config format
+        if "raw_content_url" in variant_config:
+            raw_url = f"{variant_config['raw_content_url']}/{file_name}"
+        
+        logger.info(f"Downloading {file_name} from {raw_url}")
+        response = requests.get(raw_url)
         response.raise_for_status()
         
         # Parse the YAML content

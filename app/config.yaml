@@ -3,6 +3,5 @@ server:
   cov_sprectrum_api: "https://lapis.cov-spectrum.org"
 
 curated_variant_definitions:
-  github_repo: "cbg-ethz/cowwid"
-  github_branch: "master"
-  github_path: "voc"
+  # Full GitHub repository URL (e.g., https://github.com/cbg-ethz/cowwid)
+  github_url: "https://github.com/cbg-ethz/cowwid/tree/master/voc"
