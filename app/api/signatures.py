@@ -282,7 +282,8 @@ def load_variant_definition(yaml_data: Dict[str, Any]) -> Optional[VariantDefini
         return None
 
 def get_all_variant_definitions() -> List[VariantDefinition]:
-    """Get all variant definitions from GitHub."""
+    """Get all variant definitions from GitHub, or load
+       from local cache if GitHub is unavailable."""
     files = list_github_files()
     variant_defs = []
   
