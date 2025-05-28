@@ -171,10 +171,10 @@ def render_signature_composer(
     )
 
     min_coverage = target.slider(
-        "Minimal number of sequences with this mutation - clinical sequence coverage.:", 
+        "Minimal number of known clinical sequences with this mutation for this variant:", 
         0, 250, config['default_min_coverage'], 
         key=f'{session_prefix}min_coverage',
-        help="This is the minimal number of clinical sequences that must have this mutation for it to be included. "
+        help="This is the minimal number of clinical sequences for this variant that must have this mutation for it to be included. "
              "This is useful to filter out mutations that are not well supported by the data."
     )
 
