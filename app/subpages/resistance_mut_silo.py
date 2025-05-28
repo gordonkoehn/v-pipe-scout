@@ -234,7 +234,6 @@ def app():
     st.markdown("---")
     st.write("### Resistance Mutations Over Time")
     st.write("Shows the mutations over time in wastewater for the selected date range.")
-    st.info("📊 **Heatmap colored by proportion** – The heatmap is now colored by the frequency (proportion) of each mutation. Hover over the heatmap cells to see detailed information including mutation proportion, counts, and coverage (total reads at position).")
 
     # Add radio button for showing/hiding dates with no data
     show_empty_dates = st.radio(
