@@ -138,8 +138,7 @@ def plot_resistance_mutations(freq_df, counts_df=None, coverage_freq_df=None):
         x=df_processed.columns,
         y=df_processed.index,
         colorscale='Blues',
-        showscale=True,  # Show color bar for frequency values
-        colorbar=dict(title="Frequency"),  # Add title to color bar
+        showscale=False,  # Hide color bar as requested
         hoverongaps=True, # Show hover for gaps (NaNs)
         text=hover_text,
         hoverinfo='text'
