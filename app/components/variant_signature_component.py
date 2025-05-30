@@ -144,9 +144,12 @@ def render_signature_composer(
     
     # --- UI controls ---
     variant_query = target.text_input(
-        "Enter your variant query (e.g., LP.8, B.1.617.2):", 
+        "Enter your CovSpectrum variant query (e.g., LP.8, B.1.617.2):", 
         config['default_variant'], 
-        key=f'{session_prefix}variantQuery'
+        key=f'{session_prefix}variantQuery',
+        help="Variant queries may use pango lineage queries (either called by pangolin or by Nextclade) "
+             "and filter by Nextstrain clades e.g.: BA.5* | nextcladePangoLineage:BA.5* | nextstrainClade:22B, "
+             "see https://lapis-docs.readthedocs.io/en/latest/concepts/variant_query.html#variantquery for details."
     )
 
     if config['show_nucleotides_only']:
@@ -168,9 +171,11 @@ def render_signature_composer(
     )
 
     min_coverage = target.slider(
-        "Select the minimal coverage of mutation – no of sequences:", 
+        "Minimal number of known clinical sequences with this mutation for this variant:", 
         0, 250, config['default_min_coverage'], 
-        key=f'{session_prefix}min_coverage'
+        key=f'{session_prefix}min_coverage',
+        help="This is the minimal number of clinical sequences for this variant that must have this mutation for it to be included. "
+             "This is useful to filter out mutations that are not well supported by the data."
     )
 
     # --- Manual fetch button only ---
