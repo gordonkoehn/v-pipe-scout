@@ -1,5 +1,6 @@
 import streamlit as st
 import logging
+from streamlit_theme import st_theme
 
 import subpages.index as index
 import subpages.resistance_mut_silo as resistance_mut_silo
@@ -44,9 +45,17 @@ if __name__ == "__main__":
     
     # Display the logo and create custom navigation in the sidebar
     with st.sidebar:
-        # Display the logo above navigation
-        st.image("images/V-Pipe_SILO_logo.png", caption="")
-        st.title("Navigation")
+        # Get current theme and display appropriate logo
+        theme = st_theme()
+        
+        # Display theme-appropriate logo
+        if theme and theme.get('base') == 'dark':
+            # Dark theme - use inverted logo
+            st.image("images/logo/v-pipe-scout-inverted.png", use_container_width=True)
+        else:
+            # Light theme or unknown theme - use regular logo
+            st.image("images/logo/v-pipe-scout.png", use_container_width=True)
+        
         
         # Create custom navigation links using page_link
         for page in pages:
