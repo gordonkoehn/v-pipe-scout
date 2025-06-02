@@ -21,4 +21,5 @@ dependencies:
   - pip:
       - matplotlib-venn
       - redis==5.0.1
-      - streamlit-autorefresh 
+      - streamlit-autorefresh
+      - st-theme
