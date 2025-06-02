@@ -1,9 +1,19 @@
 import streamlit as st
+from streamlit_theme import st_theme
 
 def app():
     st.title("POC: Rapid Variant Abundance Estimation 1-Month")
     
-    st.image("images/POC_Rapid_Variant_Abundance_1Month.png", caption="POC Technical Setup")
+    # Get current theme and display appropriate POC image
+    theme = st_theme()
+    
+    # Display theme-appropriate POC image
+    if theme and theme.get('base') == 'dark':
+        # Dark theme - use inverted image
+        st.image("images/index/POC_Rapid_Variant_Abundance_1Month_inverted.png", caption="POC Technical Setup")
+    else:
+        # Light theme or unknown theme - use regular image
+        st.image("images/index/POC_Rapid_Variant_Abundance_1Month.png", caption="POC Technical Setup")
     
     st.write("## Overview")
     st.write("This is a Proof-Of-Concept for the FAIR-CBG Grant Objective: Fast querying of short reads.")
