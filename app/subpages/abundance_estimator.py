@@ -674,10 +674,9 @@ def app():
                         set1 = set(combined_variants.variants[0].signature_mutations)
                         set2 = set(combined_variants.variants[1].signature_mutations)
             
-                        # Determine size based on number of variants to match heatmap size
-                        plot_size = max(350, min(500, 100 * len(combined_variants.variants)))
-                        fig_width = plot_size / 100  # Convert to inches for matplotlib
-                        fig_height = fig_width * 0.8  # Maintain aspect ratio
+                        # Use fixed, compact size to prevent excessive height on wide screens
+                        fig_width = 4.0  # Fixed width in inches
+                        fig_height = 3.0  # Fixed height in inches for better proportions
                         
                         # Create a figure with responsive size
                         fig_venn, ax_venn = plt.subplots(figsize=(fig_width, fig_height))
@@ -708,10 +707,9 @@ def app():
                         set2 = set(combined_variants.variants[1].signature_mutations)
                         set3 = set(combined_variants.variants[2].signature_mutations)
                         
-                        # Determine size based on number of variants to match heatmap size
-                        plot_size = max(350, min(500, 100 * len(combined_variants.variants)))
-                        fig_width = plot_size / 100  # Convert to inches for matplotlib
-                        fig_height = fig_width * 0.8  # Maintain aspect ratio
+                        # Use fixed, compact size to prevent excessive height on wide screens
+                        fig_width = 4.0  # Fixed width in inches
+                        fig_height = 3.0  # Fixed height in inches for better proportions
                         
                         # Create a figure with responsive size
                         fig_venn, ax_venn = plt.subplots(figsize=(fig_width, fig_height))
