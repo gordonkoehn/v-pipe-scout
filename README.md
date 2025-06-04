@@ -19,7 +19,7 @@ This is an effort of the V-Pipe team.
 For more information about V-Pipe, visit the [V-Pipe website](https://cbg-ethz.github.io/V-pipe/).
 
 <div align="center">
-  <img src="app/images/POC_Rapid_Variant_Abundance_1Month.png" alt="Fast Query Visualization" width="800"/>
+  <img src="https://github.com/gordonkoehn/v-pipe-scout/blob/main/app/images/index/POC_Rapid_Variant_Abundance_1Month.png" alt="Fast Query Visualization" width="800"/>
   <p><em>Technical architecture for real-time visualization of viral sequencing data & rapid on-demand analysis</em></p>
 </div>
 
